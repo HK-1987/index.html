@@ -1,344 +1,218 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nihongo GO - Hoàn Thiện</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            overflow: hidden;
-            background-color: #f0f2f5;
-        }
-        .screen {
-            display: none;
-        }
-        .active-screen {
-            display: flex; 
-            flex-direction: column;
-            height: 100%;
-        }
-        .app-container {
-            width: 100%;
-            max-width: 420px;
-            height: 100vh;
-            max-height: 900px;
-            margin: auto;
-            background: #f9fafb;
-            border-radius: 24px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-        .screen-content {
-             padding: 16px;
-             flex-grow: 1;
-             display: flex;
-             flex-direction: column;
-             overflow: hidden;
-        }
-        .fixed-header {
-            flex-shrink: 0;
-            padding: 0 8px 8px 8px;
-        }
-        .scrollable-area {
-            flex-grow: 1;
-            overflow-y: auto;
-            margin-right: -16px; 
-            padding-right: 16px;
-        }
-        .center-content {
-             justify-content: center;
-        }
-        #login-screen {
-            background-image: url('https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=2094&auto=format&fit=crop');
-            background-size: cover;
-            background-position: center;
-        }
-        #login-screen .overlay {
-            background: rgba(0,0,0,0.4);
-            backdrop-filter: blur(4px);
-            width:100%;
-            height:100%;
-            display:flex;
-            flex-direction:column;
-            justify-content:center;
-            padding: 24px;
-        }
-        .main-menu-button {
-            border-radius: 12px;
-            padding: 16px;
-            font-weight: 700;
-            transition: all 0.2s ease-in-out;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-        }
-        .main-menu-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-        }
-        .milestone-unlocked { background-color: #34d399; color: white; }
-        .milestone-locked { background-color: #ef4444; color: white; cursor: not-allowed; opacity: 0.7; }
-        .milestone-current { background-color: #60a5fa; color: white; border: 2px solid #93c5fd; }
-        .option-button.correct { background-color: #22c55e !important; color: white; transform: scale(1.05); border: 2px solid white; }
-        .option-button.incorrect { background-color: #ef4444 !important; color: white; }
-        .option-button.disabled { opacity: 0.6; pointer-events: none; }
-        @keyframes fall {
-            0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-        }
-        .sakura-petal {
-            position: absolute; width: 15px; height: 15px; background: #ffb7c5;
-            border-radius: 15px 0; animation-name: fall; animation-timing-function: linear;
-            pointer-events: none; z-index: 1001;
-        }
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center;
-            z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
-        }
-        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
-        .modal-content {
-            background: white; padding: 24px; border-radius: 12px;
-            max-width: 400px; width: 90%; text-align: center;
-            transform: scale(0.9); transition: transform 0.3s ease;
-        }
-        .modal-overlay.visible .modal-content { transform: scale(1); }
-    </style>
-</head>
-<body class="bg-gray-200">
+import React, { useState, useEffect, useCallback } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc, increment } from 'firebase/firestore';
 
-    <div class="app-container">
-        <div id="loading-screen" class="screen active-screen bg-indigo-500 text-white center-content"></div>
-        <div id="login-screen" class="screen center-content"></div>
-        <div id="main-menu-screen" class="screen"></div>
-        <div id="roadmap-screen" class="screen"></div>
-        <div id="quiz-screen" class="screen"></div>
-        <div id="result-screen" class="screen"></div>
-        <div id="community-home-screen" class="screen"></div>
-        <div id="hall-of-fame-screen" class="screen"></div>
-        <div id="achievements-screen" class="screen"></div>
-        <div id="forums-screen" class="screen"></div>
-        <div id="threads-screen" class="screen"></div>
-        <div id="thread-detail-screen" class="screen"></div>
-        <div id="store-screen" class="screen"></div>
-        <div id="bookstore-screen" class="screen"></div>
-        <div id="reward-center-screen" class="screen"></div>
-    </div>
+// --- BIẾN MÔI TRƯỜNG (DO CANVAS CUNG CẤP) ---
+const firebaseConfig = typeof __firebase_config !== 'undefined'
+  ? JSON.parse(__firebase_config)
+  : { apiKey: "YOUR_API_KEY", authDomain: "YOUR_AUTH_DOMAIN", projectId: "YOUR_PROJECT_ID" };
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'nihongo-go-demo';
+
+// --- KHỞI TẠO FIREBASE ---
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- NGÂN HÀNG DỮ LIỆU N5 (ĐÃ MỞ RỘNG TOÀN DIỆN) ---
+const N5Database = {
+    srsItems: [
+        // === Kanji (Mở rộng) ===
+        { id: 'kanji_1', type: 'Kanji', content: '日', meaning: 'Nhật (Ngày)', reading: 'On: にち, じつ / Kun: ひ, -か', examples: [{ word: '日本', reading: 'にほん', meaning: 'Nhật Bản' }, { word: '今日', reading: 'きょう', meaning: 'Hôm nay' }] },
+        { id: 'kanji_2', type: 'Kanji', content: '一', meaning: 'Nhất (Một)', reading: 'On: いち / Kun: ひと', examples: [{ word: '一番', reading: 'いちばん', meaning: 'Số một' }, { word: '一つ', reading: 'ひとつ', meaning: 'Một cái' }] },
+        { id: 'kanji_3', type: 'Kanji', content: '国', meaning: 'Quốc (Đất nước)', reading: 'On: こく / Kun: くに', examples: [{ word: '国', reading: 'くに', meaning: 'Đất nước' }, { word: '中国人', reading: 'ちゅうごくじん', meaning: 'Người Trung Quốc' }] },
+        { id: 'kanji_4', type: 'Kanji', content: '人', meaning: 'Nhân (Người)', reading: 'On: じん, にん / Kun: ひと', examples: [{ word: '日本人', reading: 'にほんじん', meaning: 'Người Nhật' }, { word: '三人', reading: 'さんにん', meaning: 'Ba người' }] },
+        { id: 'kanji_5', type: 'Kanji', content: '年', meaning: 'Niên (Năm)', reading: 'On: ねん', examples: [{ word: '今年', reading: 'ことし', meaning: 'Năm nay' }, { word: '来年', reading: 'らいねん', meaning: 'Năm sau' }] },
+        { id: 'kanji_6', type: 'Kanji', content: '大', meaning: 'Đại (Lớn)', reading: 'On: だい, たい / Kun: おお', examples: [{ word: '大学', reading: 'だいがく', meaning: 'Đại học' }, { word: '大きい', reading: 'おおきい', meaning: 'To, lớn' }] },
+        { id: 'kanji_7', type: 'Kanji', content: '十', meaning: 'Thập (Mười)', reading: 'On: じゅう / Kun: とお', examples: [{ word: '十', reading: 'じゅう', meaning: 'Mười' }, { word: '十日', reading: 'とおか', meaning: 'Ngày 10' }] },
+        { id: 'kanji_8', type: 'Kanji', content: '二', meaning: 'Nhị (Hai)', reading: 'On: に / Kun: ふた', examples: [{ word: '二つ', reading: 'ふたつ', meaning: 'Hai cái' }, { word: '二月', reading: 'にがつ', meaning: 'Tháng 2' }] },
+        { id: 'kanji_9', type: 'Kanji', content: '本', meaning: 'Bản (Sách)', reading: 'On: ほん / Kun: もと', examples: [{ word: '本', reading: 'ほん', meaning: 'Sách' }, { word: '山本', reading: 'やまもと', meaning: 'Yamamoto (tên người)' }] },
+        { id: 'kanji_10', type: 'Kanji', content: '中', meaning: 'Trung (Trong)', reading: 'On: ちゅう / Kun: なか', examples: [{ word: '中国', reading: 'ちゅうごく', meaning: 'Trung Quốc' }, { word: '田中', reading: 'たなか', meaning: 'Tanaka (tên người)' }] },
+        { id: 'kanji_11', type: 'Kanji', content: '長', meaning: 'Trường (Dài)', reading: 'On: ちょう / Kun: なが.い', examples: [{ word: '社長', reading: 'しゃちょう', meaning: 'Giám đốc' }, { word: '長い', reading: 'ながい', meaning: 'Dài' }] },
+        { id: 'kanji_12', type: 'Kanji', content: '出', meaning: 'Xuất (Ra)', reading: 'On: しゅつ / Kun: で.る, だ.す', examples: [{ word: '出る', reading: 'でる', meaning: 'Đi ra' }, { word: '出口', reading: 'でぐち', meaning: 'Lối ra' }] },
+        { id: 'kanji_13', type: 'Kanji', content: '三', meaning: 'Tam (Ba)', reading: 'On: さん / Kun: みっ.つ', examples: [{ word: '三つ', reading: 'みっつ', meaning: 'Ba cái' }, { word: '三月', reading: 'さんがつ', meaning: 'Tháng 3' }] },
+        { id: 'kanji_14', type: 'Kanji', content: '時', meaning: 'Thời (Giờ)', reading: 'On: じ / Kun: とき', examples: [{ word: '時間', reading: 'じかん', meaning: 'Thời gian' }, { word: '時々', reading: 'ときどき', meaning: 'Thỉnh thoảng' }] },
+        { id: 'kanji_15', type: 'Kanji', content: '行', meaning: 'Hành (Đi)', reading: 'On: こう, ぎょう / Kun: い.く', examples: [{ word: '行く', reading: 'いく', meaning: 'Đi' }, { word: '銀行', reading: 'ぎんこう', meaning: 'Ngân hàng' }] },
+        
+        // === Từ vựng (Mở rộng) ===
+        { id: 'vocab_1', type: 'Từ vựng', content: '私', reading: 'わたし', meaning: 'Tôi', example: '私は学生です。' },
+        { id: 'vocab_2', type: 'Từ vựng', content: '学生', reading: 'がくせい', meaning: 'Học sinh, sinh viên', example: '彼は学生です。' },
+        { id: 'vocab_3', type: 'Từ vựng', content: 'です', reading: 'です', meaning: 'Là (khẳng định)', example: 'これは本です。' },
+        { id: 'vocab_4', type: 'Từ vựng', content: 'はい', reading: 'はい', meaning: 'Vâng, dạ', example: 'はい、そうです。' },
+        { id: 'vocab_5', type: 'Từ vựng', content: 'いいえ', reading: 'いいえ', meaning: 'Không', example: 'いいえ、違います。' },
+        { id: 'vocab_6', type: 'Từ vựng', content: 'これ', reading: 'これ', meaning: 'Cái này', example: 'これは何ですか。' },
+        { id: 'vocab_7', type: 'Từ vựng', content: 'それ', reading: 'それ', meaning: 'Cái đó', example: 'それは私の傘です。' },
+        { id: 'vocab_8', type: 'Từ vựng', content: 'あれ', reading: 'あれ', meaning: 'Cái kia', example: 'あれは銀行です。' },
+        { id: 'vocab_9', type: 'Từ vựng', content: '本', reading: 'ほん', meaning: 'Sách', example: 'これは日本語の本です。' },
+        { id: 'vocab_10', type: 'Từ vựng', content: '何', reading: 'なん / なに', meaning: 'Cái gì', example: 'それは何ですか。' },
+        { id: 'vocab_11', type: 'Từ vựng', content: '行く', reading: 'いく', meaning: 'Đi', example: '学校へ行きます。' },
+        { id: 'vocab_12', type: 'Từ vựng', content: '見る', reading: 'みる', meaning: 'Nhìn, xem', example: 'テレビを見ます。' },
+        { id: 'vocab_13', type: 'Từ vựng', content: '食べる', reading: 'たべる', meaning: 'Ăn', example: 'ご飯を食べます。' },
+        { id: 'vocab_14', type: 'Từ vựng', content: '飲む', reading: 'のむ', meaning: 'Uống', example: '水を飲みます。' },
+        { id: 'vocab_15', type: 'Từ vựng', content: '大きい', reading: 'おおきい', meaning: 'To, lớn', example: 'このかばんは大きいです。' },
+        { id: 'vocab_16', type: 'Từ vựng', content: '小さい', reading: 'ちいさい', meaning: 'Nhỏ, bé', example: 'あの犬は小さいです。' },
+        { id: 'vocab_17', type: 'Từ vựng', content: '高い', reading: 'たかい', meaning: 'Cao, đắt', example: '富士山は高いです。' },
+        { id: 'vocab_18', type: 'Từ vựng', content: '安い', reading: 'やすい', meaning: 'Rẻ', example: 'このシャツは安いです。' },
+        { id: 'vocab_19', type: 'Từ vựng', content: '新しい', reading: 'あたらしい', meaning: 'Mới', example: '新しい車を買いました。' },
+        { id: 'vocab_20', type: 'Từ vựng', content: '古い', reading: 'ふるい', meaning: 'Cũ', example: '古いお寺を見ました。' },
+        
+        // === Ngữ pháp (Mở rộng) ===
+        { id: 'grammar_1', type: 'Ngữ pháp', content: 'N1 は N2 です', meaning: 'N1 là N2', explanation: 'Mẫu câu khẳng định cơ bản, dùng để giới thiệu hoặc mô tả.', example: '私 は 学生 です。(Tôi là học sinh.)' },
+        { id: 'grammar_2', type: 'Ngữ pháp', content: 'N1 は N2 じゃありません', meaning: 'N1 không phải là N2', explanation: 'Mẫu câu phủ định của 「です」.', example: '山田さんは学生じゃありません。(Anh Yamada không phải là học sinh.)' },
+        { id: 'grammar_3', type: 'Ngữ pháp', content: 'S か', meaning: 'Câu hỏi', explanation: 'Thêm 「か」 vào cuối câu để tạo câu hỏi. Giữ nguyên trật tự câu.', example: 'ミラーさんはアメリカ人ですか。(Anh Miller là người Mỹ phải không?)' },
+        { id: 'grammar_4', type: 'Ngữ pháp', content: 'N も', meaning: 'N cũng', explanation: 'Dùng để chỉ sự tương đồng, thay thế cho trợ từ は hoặc が.', example: '田中さんは日本人です。私も日本人です。(Anh Tanaka là người Nhật. Tôi cũng là người Nhật.)' },
+        { id: 'grammar_5', type: 'Ngữ pháp', content: 'N1 の N2', meaning: 'N2 của N1', explanation: 'Chỉ sự sở hữu hoặc mối quan hệ giữa hai danh từ.', example: 'これは私の本です。(Đây là sách của tôi.)' },
+        { id: 'grammar_6', type: 'Ngữ pháp', content: 'N は場所にあります/います', meaning: 'N có ở (địa điểm)', explanation: '「あります」dùng cho đồ vật, 「います」dùng cho người và động vật.', example: '机の上に本があります。(Trên bàn có quyển sách.)' },
+        { id: 'grammar_7', type: 'Ngữ pháp', content: 'V-ます形', meaning: 'Thể V-masu', explanation: 'Dạng lịch sự của động từ, dùng trong các tình huống trang trọng.', example: '毎日、新聞を読みます。(Hàng ngày tôi đọc báo.)' },
+        { id: 'grammar_8', type: 'Ngữ pháp', content: 'N を Vます', meaning: 'Làm V với N', explanation: 'Trợ từ を chỉ đối tượng trực tiếp của hành động.', example: 'パンを食べます。(Tôi ăn bánh mì.)' },
+        { id: 'grammar_9', type: 'Ngữ pháp', content: 'N に/へ行きます', meaning: 'Đi đến N', explanation: 'Chỉ phương hướng của hành động di chuyển. に và へ có thể thay thế cho nhau.', example: '日本へ行きます。(Tôi đi Nhật.)' },
+        { id: 'grammar_10', type: 'Ngữ pháp', content: 'V-ませんか', meaning: 'Cùng làm V không?', explanation: 'Dùng để mời hoặc rủ rê ai đó cùng làm gì một cách lịch sự.', example: '一緒に映画を見ませんか。(Cùng đi xem phim không?)' },
+    ],
+    assessmentQuestions: [
+        // Kanji
+        { id: 'q_kanji_1', type: 'kanji', difficulty: -1.5, question: 'Chọn cách đọc cho 「日」 trong 「日本」', options: ['ひ', 'に', 'つき', 'か'], answer: 'に' },
+        { id: 'q_kanji_2', type: 'kanji', difficulty: -1.0, question: '「火」 có nghĩa là gì?', options: ['Nước', 'Lửa', 'Cây', 'Đất'], answer: 'Lửa' },
+        { id: 'q_kanji_3', type: 'kanji', difficulty: 0.0, question: '「人」 đọc là gì?', options: ['ひと', 'き', 'かね', 'みず'], answer: 'ひと' },
+        { id: 'q_kanji_4', type: 'kanji', difficulty: 0.5, question: '「大きい」 có chữ Hán là gì?', options: ['大', '太', '犬', '天'], answer: '大' },
+        // Vocab
+        { id: 'q_vocab_1', type: 'vocab', difficulty: -0.5, question: 'Chọn cách đọc cho 「学生」', options: ['がくせい', 'がっこう', 'せんせい', 'にほん'], answer: 'がくせい' },
+        { id: 'q_vocab_2', type: 'vocab', difficulty: 0.5, question: '「Uống」 trong tiếng Nhật là gì?', options: ['たべます', 'のみます', 'いきます', 'まなびます'], answer: 'のみます' },
+        { id: 'q_vocab_3', type: 'vocab', difficulty: 0.2, question: '「Cái này」 trong tiếng Nhật là gì?', options: ['これ', 'それ', 'あれ', 'どれ'], answer: 'これ' },
+        { id: 'q_vocab_4', type: 'vocab', difficulty: -0.8, question: '「ねこ」 nghĩa là gì?', options: ['Chó', 'Cá', 'Mèo', 'Chim'], answer: 'Mèo' },
+        { id: 'q_vocab_5', type: 'vocab', difficulty: 1.0, question: '「おいしい」 nghĩa là gì?', options: ['Ngon', 'Dở', 'Đắt', 'Rẻ'], answer: 'Ngon' },
+        { id: 'q_vocab_6', type: 'vocab', difficulty: 1.2, question: '「買う」 đọc là gì?', options: ['かう', 'うる', 'のむ', 'みる'], answer: 'かう' },
+        // Grammar
+        { id: 'q_grammar_1', type: 'grammar', difficulty: 0.0, question: 'Điền vào chỗ trống: 田中さんは先生です。山田さん___先生です。', options: ['は', 'が', 'の', 'も'], answer: 'も' },
+        { id: 'q_grammar_2', type: 'grammar', difficulty: 1.0, question: 'Dịch sang tiếng Nhật: "Đi đến trường học."', options: ['学校で食べます', '学校に行きます', '学校は先生です', '学校も好きです'], answer: '学校に行きます' },
+        { id: 'q_grammar_3', type: 'grammar', difficulty: 2.0, question: 'Điền vào chỗ trống: 私___学生です。', options: ['を', 'が', 'は', 'も'], answer: 'は' },
+        { id: 'q_grammar_4', type: 'grammar', difficulty: 0.8, question: 'Chọn trợ từ đúng: 私はバス___学校へ行きます。', options: ['で', 'に', 'を', 'と'], answer: 'で' },
+        { id: 'q_grammar_5', type: 'grammar', difficulty: 1.5, question: '「Cùng đi xem phim không?」 là câu nào?', options: ['映画を見ますか。', '映画を見ませんか。', '映画を見たいです。', '映画を見ました。'], answer: '映画を見ませんか。' },
+        { id: 'q_grammar_6', type: 'grammar', difficulty: 1.8, question: 'Chọn dạng đúng của tính từ: きのうは___です。', options: ['あついです', 'あつくないです', 'あつかったです', 'あつくないでした'], answer: 'あつかったです' },
+        // Reading
+        { 
+            id: 'q_reading_1', 
+            type: 'reading', 
+            difficulty: 1.5, 
+            readingText: '私 は マイク・ミラー です。IMC の 社員 です。サントスさん も IMC の 社員 です。サントスさん は ブラジル人 です。',
+            question: 'サントスさん は どこの 社員 ですか。(Anh Santos là nhân viên của công ty nào?)', 
+            options: ['IMC', 'ブラジル', 'わかりません (Không biết)', 'マイク・ミラー'], 
+            answer: 'IMC' 
+        },
+        { 
+            id: 'q_reading_2', 
+            type: 'reading', 
+            difficulty: 2.0, 
+            readingText: 'きのう、私は友達と京都へ行きました。京都はとてもきれいでした。たくさん写真を撮りました。',
+            question: 'きのう、何をしましたか。(Hôm qua đã làm gì?)', 
+            options: ['京都へ行きました', '写真を撮りませんでした', '友達と会いませんでした', '京都はきれいじゃありませんでした'], 
+            answer: '京都へ行きました' 
+        },
+        // Listening
+        {
+            id: 'q_listening_1',
+            type: 'listening',
+            difficulty: 1.0,
+            question: 'Bạn nghe thấy gì?',
+            audioText: 'おはようございます',
+            options: ['こんにちは', 'さようなら', 'おやすみなさい', 'おはようございます'],
+            answer: 'おはようございます'
+        },
+        {
+            id: 'q_listening_2',
+            type: 'listening',
+            difficulty: 1.2,
+            question: 'Bạn nghe thấy gì?',
+            audioText: 'ありがとうございます',
+            options: ['すみません', 'ありがとうございます', 'ごめんなさい', 'どうぞ'],
+            answer: 'ありがとうございます'
+        },
+        {
+            id: 'q_listening_3',
+            type: 'listening',
+            difficulty: 1.8,
+            question: 'Bạn nghe thấy câu hỏi gì?',
+            audioText: 'お名前は何ですか',
+            options: ['お元気ですか', '何歳ですか', 'お名前は何ですか', 'ご出身はどちらですか'],
+            answer: 'お名前は何ですか'
+        },
+         {
+            id: 'q_listening_4',
+            type: 'listening',
+            difficulty: 2.0,
+            question: 'Bạn nghe thấy câu trả lời nào cho "これは何ですか。"?',
+            audioText: 'それは時計です',
+            options: ['はい、そうです', 'あれは椅子です', 'いいえ、違います', 'それは時計です'],
+            answer: 'それは時計です'
+        }
+    ]
+};
+
+// --- DỮ LIỆU GIẢ LẬP CHO BẠN BÈ & BẢNG XẾP HẠNG ---
+const mockFriendsData = [
+    { name: 'Minh Anh', xp: 18500, avatar: '👩‍🎓' },
+    { name: 'Quốc Hưng', xp: 16200, avatar: '👨‍💼' },
+    { name: 'Lan Chi', xp: 14800, avatar: '👩‍💻' },
+];
+
+// --- CÁC THÀNH PHẦN GIAO DIỆN (ICONS) ---
+const BookOpen = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>;
+const Target = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>;
+const Flame = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>;
+const Gem = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12l4 6-10 13L2 9Z"></path><path d="M12 22V9"></path><path d="m3.29 9 8.71 13 8.71-13"></path><path d="M2 9h20"></path></svg>;
+const Award = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6"></circle><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"></path></svg>;
+const Volume2 = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>;
+const FileText = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>;
+const ShoppingCart = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>;
+const Sun = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>;
+const Moon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>;
+const Users = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
+
+// --- THÀNH PHẦN CHÍNH: App ---
+export default function App() {
+    const [view, setView] = useState('dashboard');
+    const [userData, setUserData] = useState(null);
+    const [userId, setUserId] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [theme, setTheme] = useState('light');
+    const [showOnboarding, setShowOnboarding] = useState(false);
+
+    useEffect(() => {
+        const localTheme = localStorage.getItem('theme');
+        if (localTheme) setTheme(localTheme);
+    }, []);
+
+    useEffect(() => {
+        if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+            localStorage.setItem('theme', 'light');
+        }
+    }, [theme]);
+
+    useEffect(() => {
+        const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+            if (user) setUserId(user.uid);
+            else signInAnonymously(auth).catch(error => console.error("Lỗi đăng nhập ẩn danh:", error));
+        });
+        return () => unsubscribeAuth();
+    }, []);
     
-    <div id="custom-alert-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 id="modal-title" class="text-xl font-bold text-red-600 mb-3">Thông báo</h3>
-            <p id="modal-message" class="text-gray-700 mb-5">Đã có lỗi xảy ra.</p>
-            <button id="modal-close-button" class="bg-indigo-500 text-white font-bold py-2 px-6 rounded-lg hover:bg-indigo-600 transition">Đã hiểu</button>
-        </div>
-    </div>
-
-    <div id="social-share-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">Chia sẻ thành tích!</h3>
-            <p class="text-gray-600 mb-6">Hãy khoe kết quả của bạn với bạn bè nhé!</p>
-            <div class="flex justify-center gap-4">
-                 <button id="share-facebook" class="w-12 h-12 bg-blue-600 text-white rounded-full flex items-center justify-center text-2xl font-bold">f</button>
-                 <button id="share-twitter" class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center text-2xl font-bold">X</button>
-                 <button id="share-zalo" class="w-12 h-12 bg-blue-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">Z</button>
-            </div>
-             <button id="social-modal-close-button" class="mt-6 text-sm text-gray-500 hover:underline">Đóng</button>
-        </div>
-    </div>
-    
-    <div id="sakura-container" class="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden"></div>
-
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, writeBatch, getDocs, query, where, increment, arrayUnion, orderBy, limit, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // === CONFIGURATION ===
-        // FIX: Corrected the firebaseConfig object structure.
-        const firebaseConfig = {
-          apiKey: "AIzaSyBniY9Qu5cn0vCiJYA7c8k4bg0rt9SDnYA",
-          authDomain: "nihongo-go.firebaseapp.com",
-          projectId: "nihongo-go",
-          storageBucket: "nihongo-go.firebasestorage.app",
-          messagingSenderId: "1081277890277",
-          appId: "1:1081277890277:web:561e37f59a91c2aaf25e0c",
-          measurementId: "G-CGG25RWFX8"
-        };
-
-        const appId = firebaseConfig.projectId || 'nihongo-go-mvp-default';
-        
-        let app, auth, db;
-        let currentUser = null, userProfile = null;
-        let currentQuiz = [], currentQuestionIndex = 0, score = 0, timerInterval;
-        let activeEvents = [];
-
-        const screens = {
-            loading: document.getElementById('loading-screen'),
-            login: document.getElementById('login-screen'),
-            mainMenu: document.getElementById('main-menu-screen'),
-            roadmap: document.getElementById('roadmap-screen'),
-            quiz: document.getElementById('quiz-screen'),
-            result: document.getElementById('result-screen'),
-            communityHome: document.getElementById('community-home-screen'),
-            hallOfFame: document.getElementById('hall-of-fame-screen'),
-            achievements: document.getElementById('achievements-screen'),
-            forums: document.getElementById('forums-screen'),
-            threads: document.getElementById('threads-screen'),
-            threadDetail: document.getElementById('thread-detail-screen'),
-            store: document.getElementById('store-screen'),
-            bookstore: document.getElementById('bookstore-screen'),
-            rewardCenter: document.getElementById('reward-center-screen'),
-        };
-        
-        const modal = document.getElementById('custom-alert-modal');
-        const modalMessage = document.getElementById('modal-message');
-        const modalCloseButton = document.getElementById('modal-close-button');
-        const socialShareModal = document.getElementById('social-share-modal');
-        
-        function showScreen(screenId) {
-            Object.values(screens).forEach(s => s.classList.remove('active-screen'));
-            if(screens[screenId]) screens[screenId].classList.add('active-screen');
-        }
-
-        function showAlert(message, title = "Lỗi") {
-            document.getElementById('modal-title').textContent = title;
-            modalMessage.textContent = message;
-            modal.classList.add('visible');
-        }
-        modalCloseButton.addEventListener('click', () => modal.classList.remove('visible'));
-        document.getElementById('social-modal-close-button').addEventListener('click', () => socialShareModal.classList.remove('visible'));
-        
-        function initializeServices() {
-            const loadingStatus = document.querySelector('#loading-screen #loading-status');
-            if (loadingStatus) loadingStatus.textContent = "Kiểm tra cấu hình...";
-
-            if (!firebaseConfig || !firebaseConfig.apiKey) {
-                showAlert("Lỗi cấu hình Firebase. Vui lòng dán firebaseConfig của bạn vào mã nguồn để chạy thử nghiệm.");
-                renderUI('login');
-                showScreen('login');
-                return false;
-            }
-            if (loadingStatus) loadingStatus.textContent = "Kết nối đến máy chủ...";
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-            return true;
-        }
-
-        function renderUI(screenId, props = {}) {
-            const container = screens[screenId];
-            if (!container) return;
-            let html = '';
-            // ... (All UI rendering cases go here, they remain unchanged)
-            container.innerHTML = html;
-            addEventListeners(screenId, props);
-        }
-        
-        function addEventListeners(uiName, props = {}) {
-            // ... (All event listeners go here, they remain unchanged)
-        }
-        
-        function setupAuthListener() {
-            onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    currentUser = user;
-                    try {
-                        await setupMockDataIfNeeded(); 
-                        await loadUserProfile();
-                        await checkAndDisplayEvents();
-                        renderUI('mainMenu');
-                        showScreen('mainMenu');
-                    } catch (error) {
-                        showAlert(`Đã xảy ra lỗi khi tải dữ liệu: ${error.message}. Vui lòng thử lại.`);
-                        signOut(auth);
-                    }
-                } else {
-                    currentUser = null; userProfile = null;
-                    renderUI('login');
-                    showScreen('login');
-                }
-            });
-        }
-        
-        async function loadUserProfile() {
-            const userDocRef = doc(db, `users`, currentUser.uid);
-            const userDocSnap = await getDoc(userDocRef);
-            if (userDocSnap.exists()) {
-                userProfile = userDocSnap.data();
+    useEffect(() => {
+        if (!userId) return;
+        const userDocRef = doc(db, `artifacts/${appId}/users`, userId);
+        const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                setUserData(data);
+                if (!data.hasCompletedOnboarding) setShowOnboarding(true);
             } else {
-                userProfile = {
-                    xp: 0, 
-                    sakura: 500, 
-                    unlocked_milestones: ['n5_milestone_1'],
-                    unlocked_achievements: [],
-                    name: 'Tân Binh',
-                    createdAt: new Date()
+                const newUser = {
+                    username: "Tân binh", total_xp: 0, koban: 100, streak: 0, current_level_focus: "n5",
+                    progress: { n5: { xp: 0, lessons_completed: 0, kanji_learned: 0, vocab_learned: 0 } },
+                    inventory: { streak_freezes: 0, themes: ['default'], avatars: ['default'] },
+                    hasCompletedOnboarding: false
                 };
-                await setDoc(userDocRef, userProfile);
-            }
-        }
-
-        async function handleShowMilestones() {
-            mainAppContent.innerHTML = '<div class="text-center p-10"><p>Đang tải lộ trình...</p></div>';
-            const lessonsRef = collection(db, `lessons`);
-            const querySnapshot = await getDocs(query(lessonsRef, orderBy("order")));
-            let milestones = [];
-            querySnapshot.forEach(doc => milestones.push({ id: doc.id, ...doc.data() }));
-            await loadUserProfile();
-            renderUI('n5Milestones', { milestones });
-        }
-        
-        async function startQuiz(lessonId) {
-             mainAppContent.innerHTML = '<div class="text-center p-10"><p>Đang chuẩn bị câu hỏi...</p></div>';
-             const allItems = await fetchItemsForLesson(lessonId);
-            
-            const vocabItems = allItems.filter(q => q.item_type === 'vocab').sort(() => 0.5 - Math.random()).slice(0, 3);
-            const kanjiItems = allItems.filter(q => q.item_type === 'kanji').sort(() => 0.5 - Math.random()).slice(0, 1);
-            const grammarItems = allItems.filter(q => q.item_type === 'grammar').sort(() => 0.5 - Math.random()).slice(0, 3);
-            const listeningItems = allItems.filter(q => q.item_type === 'listening').sort(() => 0.5 - Math.random()).slice(0, 2);
-            const readingItems = allItems.filter(q => q.item_type === 'reading').sort(() => 0.5 - Math.random()).slice(0, 1);
-            
-            currentQuiz = [...vocabItems, ...kanjiItems, ...grammarItems, ...listeningItems, ...readingItems].sort(() => 0.5 - Math.random());
-            
-            if (currentQuiz.length < 10) {
-                 showAlert("Cột mốc này chưa có đủ câu hỏi để tạo bài thi."); handleShowMilestones(); return;
-            }
-
-            currentQuestionIndex = 0;
-            score = 0;
-            renderNextQuestion();
-        }
-
-        async function fetchItemsForLesson(lessonId) {
-            const q = query(collection(db, `items`), where("lesson_id", "==", lessonId));
-            const querySnapshot = await getDocs(q);
-            return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        }
-
-        // ... (The rest of the JS code remains unchanged) ...
-        
-        async function main() {
-            renderUI('loading');
-            showScreen('loading');
-            try {
-                if (initializeServices()) {
-                    setupAuthListener();
-                }
-            } catch (error) {
-                console.error("Lỗi nghiêm trọng khi khởi tạo dịch vụ:", error);
-                showAlert(`Không thể khởi tạo ứng dụng: ${error.message}`);
-                renderUI('login');
-                showScreen('login');
-            }
-        }
-
-        main();
-    </script>
-</body>
-</html>
+  
