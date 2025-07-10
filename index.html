@@ -100,8 +100,7 @@
         const badges = { 'b01': { name: 'Người Mới Bắt Đầu', icon: 'https://placehold.co/80x80/ecfccb/84cc16?text=🚴'} };
         const challenges = [
             { id: 'c01', title: 'Chuyến đi đầu tiên', description: 'Hoàn thành chuyến đi đầu tiên của bạn.', type: 'ride_count', goal: 1, rewardPoints: 50, badgeId: 'b01'},
-            { id: 'c02', title: '5km Khởi Động', description: 'Đạp xe tổng cộng.'
-             type: 'total_distance', goal: 5000, rewardPoints: 100, badgeId: null },
+            { id: 'c02', title: '5km Khởi Động', description: 'Đạp xe tổng cộng.', type: 'total_distance', goal: 5000, rewardPoints: 100, badgeId: null },
         ];
         const offlineMapRegions = [ { id: 'kanto', name: 'Kanto', size: '150MB' }, { id: 'kansai', name: 'Kansai', size: '120MB' } ];
         const storeItems = [ 
@@ -130,7 +129,8 @@
             }
         };
         const scenicSpot = { lat: 34.6879, lng: 135.5262, name: 'Lâu đài Osaka', photo: 'https://placehold.co/600x400/86efac/14532d?text=Osaka+Castle' };
-      // === DOM ELEMENTS ===
+        
+        // === DOM ELEMENTS ===
         const topLevelScreens = { login: document.getElementById('auth-container'), main: document.getElementById('main-container'), liveTracking: document.getElementById('live-tracking-screen'), detail: document.getElementById('detail-screen') };
         const mainViews = { main: document.getElementById('main-view'), community: document.getElementById('community-view'), planner: document.getElementById('planner-view'), store: document.getElementById('store-view'), challenges: document.getElementById('challenges-view'), history: document.getElementById('history-view'), profile: document.getElementById('profile-view'), analysis: document.getElementById('analysis-view'), offlineMaps: document.getElementById('offline-maps-view'), wallet: document.getElementById('wallet-view'), rules: document.getElementById('rules-view') };
 
@@ -155,7 +155,8 @@
             document.querySelectorAll('.nav-button').forEach(b => { b.classList.toggle('active', b.dataset.target === targetViewId); b.classList.toggle('text-gray-500', b.dataset.target !== targetViewId); });
         }
         function showAlert(message) { document.getElementById('alert-modal-text').textContent = message; document.getElementById('alert-modal').classList.remove('hidden'); }
-       // === MAP & CHART ===
+
+        // === MAP & CHART ===
         function initMap(mapId, view) { 
             if (state.mapInstances[mapId] && !document.body.contains(state.mapInstances[mapId].getContainer())) { state.mapInstances[mapId].remove(); state.mapInstances[mapId] = null; }
             if (state.mapInstances[mapId] === null || !state.mapInstances[mapId]) { const mapEl = document.getElementById(mapId); if (!mapEl) return; state.mapInstances[mapId] = L.map(mapEl).setView(view.center, view.zoom); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(state.mapInstances[mapId]); } 
@@ -209,7 +210,7 @@
             showTopLevelScreen('main');
             navigate('history-view');
         }
-       // === PREMIUM & FEATURE INIT ===
+         // === PREMIUM & FEATURE INIT ===
         function upgradeToPremium() { state.currentUser.isPremium = true; document.getElementById('premium-modal').classList.add('hidden'); const currentView = document.querySelector('.nav-button.active').dataset.target; navigate(currentView); }
         function initPlanner() {
             requestAnimationFrame(() => {
@@ -254,6 +255,7 @@
         }
         function initAnalysis() { const isPremium = state.currentUser.isPremium; document.getElementById('analysis-content').style.display = isPremium ? 'block' : 'none'; document.getElementById('upgrade-prompt-analysis').style.display = isPremium ? 'none' : 'block'; if(isPremium) setTimeout(initChart, 100); }
         function initOfflineMaps() { const isPremium = state.currentUser.isPremium; document.getElementById('offline-maps-content').style.display = isPremium ? 'block' : 'none'; document.getElementById('upgrade-prompt-offline').style.display = isPremium ? 'none' : 'block'; if(isPremium) renderOfflineMapsList(); }
+        
         // === UI RENDERING ===
         function renderProfile() { if (!state.currentUser) return; const statusDiv = document.getElementById('profile-status'); if (state.currentUser.isPremium) { statusDiv.innerHTML = `<p class="font-semibold text-lg text-yellow-500">⭐ Thành viên Premium</p>`; } else { statusDiv.innerHTML = `<p class="font-semibold text-lg">Thành viên Thường</p><button class="upgrade-btn mt-2 text-sm text-indigo-600 hover:underline">Nâng cấp</button>`; } const grid = document.getElementById('badge-grid'); grid.innerHTML = ''; state.currentUser.badges.forEach(badgeId => { const badge = badges[badgeId]; if (!badge) return; const el = document.createElement('div'); el.innerHTML = `<img src="${badge.icon}" alt="${badge.name}" class="w-16 h-16 rounded-full mx-auto"><p class="text-xs mt-2">${badge.name}</p>`; grid.appendChild(el); }); }
         function renderOfflineMapsList() { const listEl = document.getElementById('offline-maps-list'); listEl.innerHTML = ''; offlineMapRegions.forEach(region => { const isDownloaded = state.currentUser.offlineMaps.includes(region.id); const el = document.createElement('div'); el.className = 'flex justify-between items-center p-4'; el.innerHTML = `<div><p class="font-semibold">${region.name}</p><p class="text-sm text-gray-500">${region.size}</p></div><button data-region-id="${region.id}" class="offline-dl-btn px-4 py-2 text-sm font-medium rounded-md ${isDownloaded ? 'bg-gray-200 text-gray-500' : 'bg-blue-500 text-white'}">${isDownloaded ? 'Đã tải' : 'Tải về'}</button>`; listEl.appendChild(el); }); }
@@ -279,7 +281,7 @@
         function renderComments(ride) { const container = document.getElementById('comment-container'); container.innerHTML = '<h3 class="font-semibold text-lg mb-4">Bình luận</h3><div id="comment-list" class="space-y-4"></div>'; const listEl = document.getElementById('comment-list'); if(!ride.comments || ride.comments.length === 0) { listEl.innerHTML = '<p class="text-sm text-gray-500">Chưa có bình luận nào.</p>'; } else { ride.comments.forEach(comment => { const user = comment.userId === 'currentUser' ? state.currentUser : otherUsers[comment.userId]; listEl.innerHTML += `<div class="flex items-start space-x-3"><img src="${user.avatar}" class="w-10 h-10 rounded-full"><div class="bg-gray-100 p-3 rounded-lg flex-1"><p class="font-semibold text-sm">${user.name}</p><p class="text-sm">${comment.text}</p></div></div>`; }); } container.innerHTML += `<form id="comment-form" class="mt-4 flex space-x-2"><input id="comment-input" class="flex-grow border rounded-md p-2" placeholder="Viết bình luận..."><button type="submit" class="bg-indigo-600 text-white px-4 rounded-md font-semibold">Gửi</button></form>`; document.getElementById('comment-form').addEventListener('submit', (e) => { e.preventDefault(); addComment(ride); }); }
         function addComment(ride) { const input = document.getElementById('comment-input'); if(input.value.trim() === '') return; ride.comments.push({ userId: 'currentUser', text: input.value }); renderComments(ride); }
         function showRideDetailFromFeed(rideId) { const ride = state.ridesHistory.find(r => r.id === rideId); if(ride) showRideDetail(ride); }
-      // === GAMIFICATION & STORE LOGIC ===
+    // === GAMIFICATION & STORE LOGIC ===
         function checkAndUpdateChallenges(user, completedRide) {
             challenges.forEach(challenge => {
                 let progress = user.challengesProgress[challenge.id] || { current: 0, completed: false };
@@ -341,7 +343,8 @@
             document.querySelectorAll('.route-option-btn').forEach(btn => { btn.addEventListener('click', () => { if (!state.currentUser.isPremium) { document.getElementById('premium-modal').classList.remove('hidden'); return; } document.querySelectorAll('.route-option-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); drawPlannerRoute(state.currentPlanKey, btn.dataset.routeType); }); });
             document.getElementById('plan-route-btn').addEventListener('click', planNewRoute);
         }
-// === INITIALIZATION ===
+
+        // === INITIALIZATION ===
         document.addEventListener('DOMContentLoaded', () => { setupEventListeners(); showTopLevelScreen('login'); });
     </script>
 </body>
